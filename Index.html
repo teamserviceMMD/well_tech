@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบลงชื่อเข้างานด้วยภาพถ่าย</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { font-family: 'Noto Sans Thai', sans-serif; overflow: hidden; overscroll-behavior-y: none; }
+  </style>
+</head>
+<body class="bg-slate-100 h-[100dvh] w-full flex items-center justify-center p-4 relative">
+
+  <div class="w-full max-w-sm sm:max-w-md max-h-[95dvh] bg-white rounded-3xl shadow-xl p-5 sm:p-8 relative overflow-y-auto">
+    
+    <!-- 🔄 Loading Overlay -->
+    <div id="loading" class="hidden absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center backdrop-blur-sm">
+      <div class="animate-spin rounded-full h-14 w-14 border-4 border-slate-200 border-t-blue-600 mb-4"></div>
+      <p class="text-blue-600 font-semibold animate-pulse" id="loading-text">กำลังประมวลผล...</p>
+    </div>
+
+    <!-- 🚪 หน้าจอ 1: LOGIN -->
+    <div id="view-login" class="block">
+      <div class="text-center mb-8">
+        <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+        </div>
+        <h1 class="text-2xl font-bold text-slate-800">ลงชื่อเข้างาน</h1>
+        <p class="text-slate-500 text-sm mt-1">กรุณากรอกรหัสพนักงานเพื่อเริ่มใช้งาน</p>
+      </div>
+      <div class="space-y-5">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-2">รหัสพนักงาน</label>
+          <input type="text" id="login-id" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all text-lg text-center font-medium tracking-wide" placeholder="EMP001">
+        </div>
+        <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-200 transition duration-200 active:scale-95">
+          เข้าสู่ระบบ
+        </button>
+      </div>
+    </div>
+
+    <!-- 📸 หน้าจอ 2: หน้าลงเวลาหลัก -->
+    <div id="view-main" class="hidden space-y-5">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div>
+          <p class="text-[11px] font-semibold text-slate-400 tracking-wider uppercase">ยินดีต้อนรับ</p>
+          <h2 id="user-display-name" class="text-lg font-bold text-slate-800 leading-tight">-</h2>
+        </div>
+        <button onclick="handleLogout()" class="text-xs font-bold text-rose-500 hover:text-rose-600 bg-rose-50 px-3 py-2 rounded-lg transition active:scale-95">ออกจากระบบ</button>
+      </div>
+
+      <div class="relative rounded-2xl overflow-hidden bg-slate-900 h-64 flex items-center justify-center shadow-inner">
+        <div id="camera-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 z-10">
+          <button onclick="enableCamera()" class="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 mb-3 shadow-lg transition active:scale-95">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          </button>
+          <span class="text-slate-300 text-sm font-medium">กดเพื่อเปิดกล้อง</span>
+        </div>
+        <video id="video" autoplay playsinline class="w-full h-full object-cover -scale-x-100 hidden"></video>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-100 p-3.5 rounded-xl space-y-2.5 text-xs text-slate-600">
+        <div class="flex justify-between items-center">
+          <span class="flex items-center gap-1"><svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg> พิกัด GPS:</span>
+          <span id="gps-status" class="font-semibold text-amber-500 animate-pulse">กำลังค้นหา...</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="flex items-center gap-1"><svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg> ระยะห่างจากจุดเช็คอิน:</span>
+          <span id="distance-status" class="font-semibold">-</span>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <button onclick="submitAttendance('เข้างาน')" id="btn-checkin" disabled data-state-allowed="false" class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-sm active:scale-95 flex justify-center items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+          ลงเวลาเข้างาน
+        </button>
+        <button onclick="submitAttendance('ออกงาน')" id="btn-checkout" disabled data-state-allowed="false" class="w-full bg-rose-500 hover:bg-rose-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-sm active:scale-95 flex justify-center items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+          ลงเวลาออกงาน
+        </button>
+      </div>
+
+      <button onclick="showHistory()" class="w-full text-slate-500 hover:text-slate-700 font-semibold py-2 text-sm transition">
+        ดูประวัติย้อนหลัง
+      </button>
+    </div>
+
+    <!-- 📜 หน้าจอ 3: ประวัติ -->
+    <div id="view-history" class="hidden space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h2 class="text-lg font-bold text-slate-800">ประวัติการลงเวลา</h2>
+        <button onclick="showMain()" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg transition active:scale-95">ย้อนกลับ</button>
+      </div>
+      <div id="history-container" class="max-h-[400px] overflow-y-auto space-y-3 pr-1"></div>
+    </div>
+  </div>
+
+  <!-- 📢 Snackbar -->
+  <div id="snackbar" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 text-white text-sm font-medium py-3 px-6 rounded-full shadow-2xl transition-all duration-300 ease-out z-[9999] opacity-0 translate-y-4 pointer-events-none flex items-center gap-2 min-w-[max-content]">
+    <span id="snackbar-message">ข้อความแจ้งเตือน</span>
+  </div>
+
+  <!-- 🖼️ Modal ป๊อปอัปดูรูปภาพ -->
+  <div id="photo-modal" class="hidden fixed inset-0 bg-slate-900/90 z-[10000] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300 backdrop-blur-sm">
+    <div class="relative w-full max-w-sm mx-auto flex flex-col items-center">
+      <!-- ปุ่มปิด (กากบาท) -->
+      <button onclick="closeModal()" class="absolute -top-12 right-0 text-white hover:text-rose-400 bg-white/20 hover:bg-white/30 rounded-full p-2 transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <img id="modal-image" src="" class="w-full h-auto max-h-[80vh] rounded-2xl shadow-2xl object-cover border-4 border-white/10">
+    </div>
+  </div>
+
+  <script>
+    // 📌 ลิงก์ของคุณ
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymgtIqe3ElYakYgHM5SjaES24YUst3E1iWAVxpdHijaojGxqzHgy25c6ckEKb78Bpr/exec";
+
+    let currentUser = null;
+    let localStream = null;
+    let currentCoords = null;
+    let snackbarTimeout;
+
+    window.onload = function() {
+      const savedEmpId = localStorage.getItem("empId");
+      if (savedEmpId) {
+        showLoading("กำลังเข้าสู่ระบบเดิม...");
+        callAPI({ action: "login", empId: savedEmpId }, function(response) {
+          hideLoading();
+          if (response.success) {
+            currentUser = response;
+            showMain();
+          } else {
+            localStorage.removeItem("empId");
+          }
+        });
+      }
+    };
+
+    function showSnackbar(message, type = 'info') {
+      const snackbar = document.getElementById("snackbar");
+      const snackMsg = document.getElementById("snackbar-message");
+      
+      snackbar.className = "fixed bottom-6 left-1/2 transform -translate-x-1/2 text-white text-sm font-medium py-3 px-6 rounded-full shadow-2xl transition-all duration-300 ease-out z-[9999] opacity-0 translate-y-4 pointer-events-none flex items-center gap-2 min-w-[max-content]";
+      
+      if (type === 'success') {
+        snackbar.classList.add('bg-emerald-600');
+        snackMsg.innerHTML = `<svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> ${message}`;
+      } else if (type === 'error') {
+        snackbar.classList.add('bg-rose-600');
+        snackMsg.innerHTML = `<svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> ${message}`;
+      } else {
+        snackbar.classList.add('bg-slate-800');
+        snackMsg.innerText = message;
+      }
+      
+      snackbar.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      snackbar.classList.add('opacity-100', 'translate-y-0');
+      
+      clearTimeout(snackbarTimeout);
+      snackbarTimeout = setTimeout(() => {
+        snackbar.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        snackbar.classList.remove('opacity-100', 'translate-y-0');
+      }, 3500);
+    }
+
+    // 📌 ฟังก์ชันเปิด/ปิด Modal รูปภาพ
+    function openModal(url) {
+      document.getElementById("modal-image").src = url;
+      const modal = document.getElementById("photo-modal");
+      modal.classList.remove("hidden");
+      setTimeout(() => { modal.classList.remove("opacity-0"); }, 10);
+    }
+    function closeModal() {
+      const modal = document.getElementById("photo-modal");
+      modal.classList.add("opacity-0");
+      setTimeout(() => {
+        modal.classList.add("hidden");
+        document.getElementById("modal-image").src = "";
+      }, 300);
+    }
+
+    function callAPI(payload, callback) {
+      fetch(GAS_WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(data => callback(data))
+      .catch(err => {
+        hideLoading();
+        showSnackbar("การเชื่อมต่อระบบขัดข้อง โปรดลองใหม่", "error");
+      });
+    }
+
+    function showLoading(text) {
+      document.getElementById("loading-text").innerText = text;
+      document.getElementById("loading").classList.remove("hidden");
+    }
+    function hideLoading() {
+      document.getElementById("loading").classList.add("hidden");
+    }
+
+    function handleLogin() {
+      const empId = document.getElementById("login-id").value.trim();
+      if (!empId) return showSnackbar("กรุณากรอกรหัสพนักงาน", "error");
+      
+      showLoading("กำลังตรวจสอบ...");
+      callAPI({ action: "login", empId: empId }, function(response) {
+        hideLoading();
+        if (response.success) {
+          currentUser = response;
+          localStorage.setItem("empId", response.empId);
+          showMain();
+          showSnackbar("เข้าสู่ระบบสำเร็จ", "success");
+        } else {
+          showSnackbar(response.message, "error");
+        }
+      });
+    }
+
+    function handleLogout() {
+      localStorage.removeItem("empId");
+      currentUser = null;
+      stopCamera();
+      document.getElementById("view-main").classList.add("hidden");
+      document.getElementById("view-login").classList.remove("hidden");
+      document.getElementById("login-id").value = "";
+      showSnackbar("ออกจากระบบเรียบร้อย", "info");
+    }
+
+    function showMain() {
+      document.getElementById("view-login").classList.add("hidden");
+      document.getElementById("view-history").classList.add("hidden");
+      document.getElementById("view-main").classList.remove("hidden");
+      document.getElementById("user-display-name").innerText = currentUser.fullName;
+      
+      updateButtonStates(currentUser.lastAction);
+      startLocationWatch(); 
+    }
+
+    function enableCamera() {
+      document.getElementById("camera-overlay").classList.add("hidden");
+      document.getElementById("video").classList.remove("hidden");
+      startCamera();
+    }
+
+    function updateButtonStates(lastAction) {
+      const btnCheckin = document.getElementById("btn-checkin");
+      const btnCheckout = document.getElementById("btn-checkout");
+      
+      if (lastAction === "เข้างาน") {
+        btnCheckin.setAttribute("data-state-allowed", "false");
+        btnCheckout.setAttribute("data-state-allowed", "true");
+      } else {
+        btnCheckin.setAttribute("data-state-allowed", "true");
+        btnCheckout.setAttribute("data-state-allowed", "false");
+      }
+      evaluateButtons();
+    }
+
+    function evaluateButtons() {
+      if (!currentCoords || !currentUser) return;
+      const dist = calculateDistance(currentCoords.lat, currentCoords.lng, currentUser.targetLat, currentUser.targetLng);
+      
+      const btnCheckin = document.getElementById("btn-checkin");
+      const btnCheckout = document.getElementById("btn-checkout");
+      const isWithinRadius = dist <= currentUser.allowedRadius;
+      
+      btnCheckin.disabled = !(btnCheckin.getAttribute("data-state-allowed") === "true");
+      btnCheckout.disabled = !(btnCheckout.getAttribute("data-state-allowed") === "true");
+
+      if (isWithinRadius) {
+        document.getElementById("distance-status").className = "font-semibold text-emerald-600";
+        document.getElementById("distance-status").innerText = dist + " เมตร (ในพื้นที่)";
+      } else {
+        document.getElementById("distance-status").className = "font-semibold text-rose-500";
+        document.getElementById("distance-status").innerText = dist + " เมตร (อยู่นอกพื้นที่!)";
+      }
+    }
+
+    async function startCamera() {
+      try {
+        if (localStream) stopCamera();
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        localStream = stream;
+        document.getElementById("video").srcObject = stream;
+      } catch (err) {
+        showSnackbar("ไม่สามารถเปิดกล้องได้", "error");
+      }
+    }
+
+    function stopCamera() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      document.getElementById("camera-overlay").classList.remove("hidden");
+      document.getElementById("video").classList.add("hidden");
+    }
+
+    function startLocationWatch() {
+      document.getElementById("gps-status").innerHTML = `<span class="text-amber-500 animate-pulse">กำลังค้นหา...</span>`;
+      document.getElementById("distance-status").innerText = "-";
+      
+      if (!navigator.geolocation) return showSnackbar("อุปกรณ์ไม่รองรับ GPS", "error");
+
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          currentCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
+          document.getElementById("gps-status").innerHTML = `<span class="text-emerald-600 font-semibold">พร้อมใช้งาน</span>`;
+          evaluateButtons();
+        },
+        function(err) { document.getElementById("gps-status").innerHTML = `<span class="text-rose-500">กรุณาเปิด GPS</span>`; },
+        { enableHighAccuracy: true, timeout: 15000 }
+      );
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; const p1 = lat1 * Math.PI/180; const p2 = lat2 * Math.PI/180;
+      const dp = (lat2-lat1) * Math.PI/180; const dl = (lon2-lon1) * Math.PI/180;
+      const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    function captureAndCompress() {
+      const video = document.getElementById("video");
+      const canvas = document.createElement("canvas");
+      canvas.width = 640; canvas.height = 480;
+      const ctx = canvas.getContext("2d");
+      ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.7);
+    }
+
+    function submitAttendance(type) {
+      if (!currentCoords) return showSnackbar("ยังไม่พบตำแหน่ง GPS", "error");
+      if (!localStream) return showSnackbar("กรุณากดเปิดกล้องก่อนลงเวลา", "error");
+      
+      document.getElementById("btn-checkin").disabled = true;
+      document.getElementById("btn-checkout").disabled = true;
+      
+      showLoading(`กำลังบันทึก${type}...`);
+      const payload = {
+        action: "save", empId: currentUser.empId, fullName: currentUser.fullName,
+        type: type, lat: currentCoords.lat, lng: currentCoords.lng,
+        targetLat: currentUser.targetLat, targetLng: currentUser.targetLng,
+        allowedRadius: currentUser.allowedRadius, photoBase64: captureAndCompress()
+      };
+
+      callAPI(payload, function(response) {
+        hideLoading();
+        if (response.success) {
+          showSnackbar(response.message, "success");
+          currentUser.lastAction = type;
+          updateButtonStates(type);
+          showHistory();
+        } else {
+          showSnackbar(response.message, "error");
+          updateButtonStates(currentUser.lastAction);
+        }
+      });
+    }
+
+    // 📌 สร้างหน้าจอประวัติแบบกล่องเดียว (เข้า-ออก รวมกัน)
+    function showHistory() {
+      stopCamera();
+      document.getElementById("view-main").classList.add("hidden");
+      document.getElementById("view-history").classList.remove("hidden");
+      
+      showLoading("กำลังดึงประวัติ...");
+      callAPI({ action: "history", empId: currentUser.empId }, function(data) {
+        hideLoading();
+        const container = document.getElementById("history-container");
+        container.innerHTML = "";
+        
+        if (data.length === 0) {
+          container.innerHTML = `<div class="text-center py-10 bg-slate-50 rounded-xl text-sm text-slate-400">ยังไม่มีประวัติการลงเวลา</div>`;
+          return;
+        }
+        
+        data.forEach(item => {
+          // ส่วน Check-In HTML
+          let inHtml = `<div class="text-center py-2 text-xs text-slate-400 border border-dashed rounded-lg">ยังไม่บันทึกเข้างาน</div>`;
+          if (item.timeIn) {
+            const inStatusColor = (item.statusIn === "ปกติ") ? "text-emerald-600" : "text-rose-600";
+            inHtml = `
+              <div class="flex justify-between items-center bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100">
+                <div>
+                  <span class="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-md font-bold">เข้างาน</span>
+                  <span class="font-bold text-slate-700 ml-1">${item.timeIn} น.</span>
+                  <div class="text-[10px] text-slate-500 mt-1">ระยะห่าง: <span class="${inStatusColor} font-bold">${item.distIn} ม.</span></div>
+                </div>
+                ${item.photoIn ? `<button onclick="openModal('${item.photoIn}')" class="text-[11px] font-bold text-blue-500 bg-white border border-blue-100 hover:bg-blue-50 px-2.5 py-1.5 rounded-md shadow-sm transition">ดูรูป</button>` : ''}
+              </div>`;
+          }
+
+          // ส่วน Check-Out HTML
+          let outHtml = `<div class="text-center py-2 text-xs text-slate-400 border border-dashed rounded-lg">ยังไม่บันทึกออกงาน</div>`;
+          if (item.timeOut) {
+            const outStatusColor = (item.statusOut === "ปกติ") ? "text-emerald-600" : "text-rose-600";
+            outHtml = `
+              <div class="flex justify-between items-center bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100 mt-2">
+                <div>
+                  <span class="bg-indigo-500 text-white text-[10px] px-2 py-0.5 rounded-md font-bold">ออกงาน</span>
+                  <span class="font-bold text-slate-700 ml-1">${item.timeOut} น.</span>
+                  <div class="text-[10px] text-slate-500 mt-1">ระยะห่าง: <span class="${outStatusColor} font-bold">${item.distOut} ม.</span></div>
+                </div>
+                ${item.photoOut ? `<button onclick="openModal('${item.photoOut}')" class="text-[11px] font-bold text-blue-500 bg-white border border-blue-100 hover:bg-blue-50 px-2.5 py-1.5 rounded-md shadow-sm transition">ดูรูป</button>` : ''}
+              </div>`;
+          }
+          
+          container.innerHTML += `
+            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+              <div class="text-xs font-bold text-slate-800 mb-2 border-b pb-2 flex items-center gap-1">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                วันที่: ${item.date}
+              </div>
+              ${inHtml}
+              ${outHtml}
+            </div>
+          `;
+        });
+      });
+    }
+  </script>
+</body>
+</html>
